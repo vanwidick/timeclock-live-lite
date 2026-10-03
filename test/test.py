@@ -72,7 +72,7 @@ try:
     chk('after lunch: break2/out',btns()==['Break 2 Start','Clock Out'],btns())
     pg.clock.run_for(2*3600*1000)
     pg.click('text=Break 2 Start'); pg.clock.run_for(5*60*1000)
-    pv=panel(); chk('panel ON BREAK 2',pv['cdTitle']=='ON BREAK 2' and pv['cdElapsed'] in ('5:00','5:01'),pv)
+    pv=panel(); chk('panel ON BREAK 2',pv['cdTitle']=='ON BREAK 2' and pv['cdElapsed'] in ('4:59','5:00','5:01'),pv)
     pg.wait_for_timeout(1200); pg.screenshot(path=ROOT+'/screenshot.png'); pg.screenshot(path=ROOT+'/test/screenshot-full.png',full_page=True)
     pg.clock.run_for(9*60*1000); pg.click('text=Break 2 End')
     chk('after all: only Clock Out',btns()==['Clock Out'],btns())

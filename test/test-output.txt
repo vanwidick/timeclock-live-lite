@@ -7,10 +7,10 @@ PASS pay period total pre :: 39:28
 PASS after in: break1/lunch/out :: ['Break 1 Start', 'Lunch Out', 'Clock Out']
 PASS on break only End :: ['Break 1 End']
 PASS panel visible at very top (above header) :: ({'x': 12, 'y': 10, 'width': 336, 'height': 284.578125}, {'x': 12, 'y': 304.578125, 'width': 336, 'height': 31.890625})
-PASS panel break 1 label/left/due :: {'cdTitle': 'ON BREAK 1', 'cdOut': '9:30 AM', 'cdDue': '9:45 AM', 'cdLeft': '14:59', 'cdElapsed': '0:01', 'cdLeftLbl': 'TIME LEFT'}
-PASS stopwatch starts ~0:00 :: 0:01
-PASS stopwatch counts up 1:05 :: {'cdTitle': 'ON BREAK 1', 'cdOut': '9:30 AM', 'cdDue': '9:45 AM', 'cdLeft': '13:54', 'cdElapsed': '1:06', 'cdLeftLbl': 'TIME LEFT'}
-PASS countdown counts down 13:55 :: {'cdTitle': 'ON BREAK 1', 'cdOut': '9:30 AM', 'cdDue': '9:45 AM', 'cdLeft': '13:54', 'cdElapsed': '1:06', 'cdLeftLbl': 'TIME LEFT'}
+PASS panel break 1 label/left/due :: {'cdTitle': 'ON BREAK 1', 'cdOut': '9:30 AM', 'cdDue': '9:45 AM', 'cdLeft': '15:00', 'cdElapsed': '0:00', 'cdLeftLbl': 'TIME LEFT'}
+PASS stopwatch starts ~0:00 :: 0:00
+PASS stopwatch counts up 1:05 :: {'cdTitle': 'ON BREAK 1', 'cdOut': '9:30 AM', 'cdDue': '9:45 AM', 'cdLeft': '13:55', 'cdElapsed': '1:05', 'cdLeftLbl': 'TIME LEFT'}
+PASS countdown counts down 13:55 :: {'cdTitle': 'ON BREAK 1', 'cdOut': '9:30 AM', 'cdDue': '9:45 AM', 'cdLeft': '13:55', 'cdElapsed': '1:05', 'cdLeftLbl': 'TIME LEFT'}
 PASS panel stays pinned at top when scrolled :: (736, {'x': 12, 'y': 0, 'width': 336, 'height': 284.578125})
 PASS warn at <=3 min :: ('on warn', '2:54')
 PASS late at zero :: ('on late', 'LATE +0:06')
@@ -25,10 +25,10 @@ PASS panel ON LUNCH with due +30 :: {'cdTitle': 'ON LUNCH', 'cdOut': '11:30 AM',
 PASS lunch not warn at 5:30 left :: 5:30
 PASS lunch warn at <=5 :: 4:30
 PASS after lunch: break2/out :: ['Break 2 Start', 'Clock Out']
-FAIL panel ON BREAK 2 :: {'cdTitle': 'ON BREAK 2', 'cdOut': '1:59 PM', 'cdDue': '2:14 PM', 'cdLeft': '10:01', 'cdElapsed': '4:59', 'cdLeftLbl': 'TIME LEFT'}
+PASS panel ON BREAK 2 :: {'cdTitle': 'ON BREAK 2', 'cdOut': '1:59 PM', 'cdDue': '2:14 PM', 'cdLeft': '10:00', 'cdElapsed': '5:00', 'cdLeftLbl': 'TIME LEFT'}
 PASS after all: only Clock Out :: ['Clock Out']
 PASS after out: Clock Back In :: ['Clock Back In']
-PASS stored format :: [['in', 28680], ['bs', 34200], ['be', 35106], ['lo', 41406], ['li', 43176], ['bs', 50377], ['be', 51218], ['out', 58418]]
+PASS stored format :: [['in', 28680], ['bs', 34200], ['be', 35106], ['lo', 41406], ['li', 43177], ['bs', 50377], ['be', 51219], ['out', 58419]]
 Clock In
 7:58 AM
 Break 1 Start
@@ -37,24 +37,24 @@ Break 1 End15:06
 9:45 AM
 Lunch Out
 11:30 AM
-Lunch In29:30
+Lunch In29:31
 11:59 AM
 Break 2 Start
 1:59 PM
-Break 2 End14:01
+Break 2 End14:02
 2:13 PM
 Clock Out
 4:13 PM
 PASS timeline h:mm AM/PM
 PASS export filename
 PASS export keys :: ['app', 'version', 'saved', 'punches', 'days']
-{"clockIn": "07:58:00", "clockOut": "16:13:38", "break1": {"start": "09:30:00", "end": "09:45:06", "sec": 906, "open": false}, "break2": {"start": "13:59:37", "end": "14:13:38", "sec": 841, "open": false}, "lunch": {"start": "11:30:06", "end": "11:59:36", "sec": 1770, "open": false}, "breakCount": 2, "workedMin": 466}
+{"clockIn": "07:58:00", "clockOut": "16:13:39", "break1": {"start": "09:30:00", "end": "09:45:06", "sec": 906, "open": false}, "break2": {"start": "13:59:37", "end": "14:13:39", "sec": 842, "open": false}, "lunch": {"start": "11:30:06", "end": "11:59:37", "sec": 1771, "open": false}, "breakCount": 2, "workedMin": 466}
 PASS summary fields
-PASS saved format :: 2026-10-03 16:13:38
+PASS saved format :: 2026-10-03 16:13:39
 PASS worked today = 7:58->16:13:36 minus 29:30 lunch = 466 min :: 466
 PASS punches compact one-line
 PASS import roundtrip
 PASS no JS errors :: []
 PASS loads offline via SW
-SOME FAILED
+ALL PASS
 DONE
