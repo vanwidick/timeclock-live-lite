@@ -33,21 +33,28 @@ header h1 span{color:var(--green)}
 .st-in #status{background:rgba(34,197,94,.15);color:var(--green)} .st-break #status{background:rgba(59,130,246,.15);color:#7fb0ff} .st-lunch #status{background:rgba(245,158,11,.15);color:var(--amber)} .st-out #status{background:rgba(239,68,68,.15);color:#ff8a8a}
 #worked{font-family:var(--disp);font-weight:700;font-size:60px;line-height:1;margin:8px 0 2px;font-variant-numeric:tabular-nums}
 #workedLbl{font-size:12px;color:var(--dim);letter-spacing:.08em}
-#cd{display:none;margin-top:12px;padding:12px;border-radius:12px;background:#0f1a2e}
+#cd{display:none;position:sticky;top:env(safe-area-inset-top);z-index:5;margin:0 0 10px;padding:12px 14px 12px;border-radius:16px;background:#0f1a2e;border:2px solid var(--blue);box-shadow:0 6px 18px rgba(0,0,0,.55);text-align:center}
 #cd.on{display:block}
-#cd.lunch{background:#231a08}
-#cdTitle{font-size:14px;color:var(--dim)}
-#cdLeft{font-family:var(--disp);font-weight:700;font-size:72px;line-height:1;font-variant-numeric:tabular-nums}
-#cdSub{font-size:13px;color:var(--dim)}
+#cd.lunch{background:#231a08;border-color:var(--amber)}
+#cdTitle{font-family:var(--disp);font-weight:700;font-size:26px;letter-spacing:.06em;color:#7fb0ff;line-height:1}
+#cd.lunch #cdTitle{color:var(--amber)}
+.cdTimes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 4px}
+.cdTimes div{background:rgba(0,0,0,.28);border-radius:10px;padding:6px 4px}
+.cdTimes small{display:block;font-size:11px;color:var(--dim);letter-spacing:.08em;font-weight:700}
+.cdTimes b{font-family:var(--disp);font-weight:700;font-size:24px;font-variant-numeric:tabular-nums}
+#cdLeftLbl{font-size:11px;color:var(--dim);letter-spacing:.1em;font-weight:700;margin-top:6px}
+#cdLeft{font-family:var(--disp);font-weight:700;font-size:80px;line-height:1;font-variant-numeric:tabular-nums}
+#cdElapsedRow{display:flex;justify-content:center;align-items:baseline;gap:8px;margin-top:4px}
+#cdElapsedRow small{font-size:11px;color:var(--dim);letter-spacing:.1em;font-weight:700}
+#cdElapsed{font-family:var(--disp);font-weight:700;font-size:30px;font-variant-numeric:tabular-nums;color:#e5e7eb}
 #cdBar{height:8px;border-radius:9px;background:#262c36;margin-top:8px;overflow:hidden}
-#cdBar i{display:block;height:100%;width:0;background:var(--blue);transition:width 1s linear}
+#cdBar i{display:block;height:100%;width:0;background:var(--blue)}
 #cd.lunch #cdBar i{background:var(--amber)}
 #cd.warn{animation:flash .8s steps(2,start) infinite}
 #cd.warn #cdLeft{color:var(--amber)}
-#cd.late{background:#3a0d0d!important;animation:flash .5s steps(2,start) infinite}
-#cd.late #cdLeft{color:#ff6b6b}
-@keyframes flash{50%{background:#5b3a00;box-shadow:0 0 0 3px var(--amber) inset}}
-#cd.late{--x:0}
+#cd.late{background:#3a0d0d!important;border-color:var(--red)!important;animation:flash .5s steps(2,start) infinite}
+#cd.late #cdLeft,#cd.late #cdLeftLbl{color:#ff6b6b}
+#cd.late #cdBar i{background:var(--red)}
 body.flashAll::after{content:"";position:fixed;inset:0;background:rgba(255,255,255,.35);pointer-events:none;animation:fade 1.2s ease-out forwards}
 @keyframes fade{to{opacity:0}}
 #acts{display:grid;gap:10px;margin-bottom:10px}
@@ -91,6 +98,14 @@ footer .ver{color:var(--dim);font-size:12px;margin-top:4px;letter-spacing:.04em}
 </style>
 </head>
 <body>
+<section id="cd" aria-live="polite">
+  <div id="cdTitle">ON BREAK 1</div>
+  <div class="cdTimes"><div><small>LEFT AT</small><b id="cdOut">--</b></div><div><small>DUE BACK</small><b id="cdDue">--</b></div></div>
+  <div id="cdLeftLbl">TIME LEFT</div>
+  <div id="cdLeft">15:00</div>
+  <div id="cdElapsedRow"><small>ELAPSED</small><span id="cdElapsed">0:00</span></div>
+  <div id="cdBar"><i></i></div>
+</section>
 <header>
   <h1 class="disp">TimeClock <span>Live Lite</span></h1>
   <div id="clock">--:--<small id="dateLbl"></small></div>
@@ -100,12 +115,6 @@ footer .ver{color:var(--dim);font-size:12px;margin-top:4px;letter-spacing:.04em}
   <div id="status" class="disp">Not clocked in</div>
   <div id="worked">0:00:00</div>
   <div id="workedLbl" class="disp">Worked today</div>
-  <div id="cd">
-    <div id="cdTitle" class="disp">Break 1</div>
-    <div id="cdLeft">15:00</div>
-    <div id="cdSub">Back by --</div>
-    <div id="cdBar"><i></i></div>
-  </div>
 </section>
 
 <section id="acts"></section>
@@ -139,7 +148,7 @@ footer .ver{color:var(--dim);font-size:12px;margin-top:4px;letter-spacing:.04em}
 
 <footer>
   <div class="by">Design by Van</div>
-  <div class="ver">v1.0.0 · Oct 3, 2026</div>
+  <div class="ver">v1.1.0 · Oct 3, 2026</div>
 </footer>
 
 <div id="jsonBox"><textarea id="jsonTxt" readonly></textarea>
@@ -148,7 +157,7 @@ footer .ver{color:var(--dim);font-size:12px;margin-top:4px;letter-spacing:.04em}
 
 <script>
 "use strict";
-const APP="TimeClock Live Lite", VERSION="1.0.0", TZ="America/Chicago", KEY="punches";
+const APP="TimeClock Live Lite", VERSION="1.1.0", TZ="America/Chicago", KEY="punches";
 const BREAK_SEC=15*60, BREAK_WARN=3*60, LUNCH_SEC=30*60, LUNCH_WARN=5*60;
 const PP_ANCHOR="2026-09-26", PP_DAYS=14;
 const $=id=>document.getElementById(id);
@@ -254,9 +263,11 @@ function render(){const n=nowCT(),iso=n.iso,st=state(iso),r=st.r;
   const cd=$("cd");
   if(st.k==="break"||st.k==="lunch"){const isL=st.k==="lunch",s0=isL?r.Lo:st.ob.s,len=isL?LUNCH_SEC:BREAK_SEC,warnAt=isL?LUNCH_WARN:BREAK_WARN;
     const left=len-(n.sec-s0);cd.className="on"+(isL?" lunch":"")+(left<=0?" late":left<=warnAt?" warn":"");
-    $("cdTitle").textContent=isL?"Lunch · 30 min":`Break ${st.n} · 15 min`;
+    $("cdTitle").textContent=isL?"ON LUNCH":`ON BREAK ${st.n}`;
+    $("cdOut").textContent=tod12(s0);$("cdDue").textContent=tod12(s0+len);
+    $("cdLeftLbl").textContent=left<=0?"PAST DUE":"TIME LEFT";
     $("cdLeft").textContent=left<=0?"LATE "+ms(left):ms(left);
-    $("cdSub").textContent="Back by "+tod12(s0+len)+" · gone "+ms(n.sec-s0);
+    {const e=n.sec-s0;$("cdElapsed").textContent=e<3600?ms(e):hms(e);}
     $("cdBar").firstChild.style.width=Math.min(100,(n.sec-s0)/len*100)+"%";
     const key=iso+":"+st.k+":"+s0;
     if(left<=warnAt&&left>0&&!fired(key+":warn"))alarm("warn");
