@@ -1,0 +1,32 @@
+PASS PC pushed desktop punches to cloud
+PASS sync card off by default
+PASS bad token shows error :: Sync: token rejected (401)
+PASS connected :: Synced 9:30 AM · vanwidick/timeclock-sync
+PASS phone pulled PC clock-in (shows break/lunch/out) :: ['Break 1 Start', 'Lunch Out', 'Clock Out']
+PASS token not shown/kept in input
+PASS phone punch pushed to cloud :: [['in', 28800], ['bs', 34202]]
+PASS cloud doc marked by phone
+PASS PC running: file not touched
+PASS PC closed: phone break written into data file :: [['in', 28800], ['bs', 34202]]
+PASS alerts.topic still in file and never in cloud
+PASS desktop Break End reached phone :: ['Break 2 Start', 'Lunch Out', 'Clock Out']
+PASS phone timeline shows PC punch
+PASS undo synced to cloud
+PASS undo reached PC file :: [['in', 28800], ['bs', 34202]]
+PASS token not in export
+PASS history day from PC visible on phone :: Today 10/3
+1:30
+Fri 10/2
+8:00
+Thu 10/1
+—
+Wed 9/30
+—
+Tue 9/29
+—
+Mon 9/28
+—
+Sun 9/27
+—
+PASS no JS errors :: []
+ALL PASS

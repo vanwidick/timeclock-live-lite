@@ -92,6 +92,11 @@ h2 b{color:var(--txt);font-size:17px}
 footer{text-align:center;margin-top:18px;padding-bottom:6px}
 footer .by{font-family:var(--disp);font-weight:700;font-size:30px;letter-spacing:.14em;color:#e5e7eb;text-transform:uppercase;line-height:1}
 footer .ver{color:var(--dim);font-size:12px;margin-top:4px;letter-spacing:.04em}
+#syncCard .row{display:flex;gap:8px;margin-top:8px}
+#syncCard input{flex:1;min-width:0;background:#0f1115;color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:15px;-webkit-user-select:text;user-select:text}
+#syncSt{font-size:13px;color:var(--dim)} #syncSt.ok{color:var(--green)} #syncSt.err{color:#ff8a8a}
+#syncDot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#4b5563;margin-right:6px}
+#syncDot.ok{background:var(--green)} #syncDot.err{background:var(--red)} #syncDot.busy{background:var(--amber)}
 #jsonBox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:8;padding:calc(env(safe-area-inset-top) + 20px) 14px 20px}
 #jsonBox.on{display:block}
 #jsonBox textarea{width:100%;height:65vh;background:#0f1115;color:#d1d5db;border:1px solid var(--line);border-radius:10px;font:12px/1.3 ui-monospace,Menlo,monospace;padding:8px;-webkit-user-select:text;user-select:text}
@@ -137,6 +142,17 @@ footer .ver{color:var(--dim);font-size:12px;margin-top:4px;letter-spacing:.04em}
   <div class="hist" id="hist"></div>
 </section>
 
+<section class="card" id="syncCard">
+  <h2 class="disp">Cloud sync with PC <b><span id="syncDot"></span><span id="syncLbl">Off</span></b></h2>
+  <div id="syncSt">Not set up. Punches stay on this phone.</div>
+  <div id="syncSetup">
+    <div class="row"><input id="syncRepo" placeholder="owner/repo" value="vanwidick/timeclock-sync" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+    <div class="row"><input id="syncTok" type="password" placeholder="Fine-grained GitHub token (this repo only)" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+    <div class="row"><button class="small" id="bSyncSave" style="flex:1">Connect &amp; sync</button></div>
+  </div>
+  <div class="row" id="syncOn" style="display:none"><button class="small" id="bSyncNow" style="flex:1">Sync now</button><button class="small" id="bSyncOff" style="flex:1">Disconnect</button></div>
+</section>
+
 <section class="card">
   <div class="tools">
     <button class="small" id="bExport">Export JSON</button>
@@ -148,7 +164,7 @@ footer .ver{color:var(--dim);font-size:12px;margin-top:4px;letter-spacing:.04em}
 
 <footer>
   <div class="by">Design by Van</div>
-  <div class="ver">v1.1.0 · Oct 3, 2026</div>
+  <div class="ver">v1.2.0 · Oct 3, 2026</div>
 </footer>
 
 <div id="jsonBox"><textarea id="jsonTxt" readonly></textarea>
@@ -157,7 +173,7 @@ footer .ver{color:var(--dim);font-size:12px;margin-top:4px;letter-spacing:.04em}
 
 <script>
 "use strict";
-const APP="TimeClock Live Lite", VERSION="1.1.0", TZ="America/Chicago", KEY="punches";
+const APP="TimeClock Live Lite", VERSION="1.2.0", TZ="America/Chicago", KEY="punches";
 const BREAK_SEC=15*60, BREAK_WARN=3*60, LUNCH_SEC=30*60, LUNCH_WARN=5*60;
 const PP_ANCHOR="2026-09-26", PP_DAYS=14;
 const $=id=>document.getElementById(id);
@@ -238,14 +254,14 @@ function fired(key){const k="tcl-fired";let s;try{s=JSON.parse(sessionStorage.ge
   if(s.includes(key))return true;s.push(key);sessionStorage.setItem(k,JSON.stringify(s.slice(-40)));return false;}
 
 /* ---------- actions ---------- */
-function punch(kind){unlockAudio();const n=nowCT();(P[n.iso]=P[n.iso]||[]).push([kind,n.sec]);save();disarmUndo();render();
+function punch(kind){unlockAudio();const n=nowCT();(P[n.iso]=P[n.iso]||[]).push([kind,n.sec]);save();disarmUndo();render();syncSoon();
   toast(({in:"Clocked in",out:"Clocked out",bs:"Break started",be:"Break ended",lo:"Lunch started",li:"Back from lunch"})[kind]+" · "+tod12(n.sec));
   if(navigator.vibrate)try{navigator.vibrate(40);}catch(e){}}
 let undoArmed=0;
 function disarmUndo(){undoArmed=0;}
 function undo(){const n=nowCT();const l=P[n.iso];if(!l||!l.length)return;
   if(!undoArmed||Date.now()-undoArmed>4000){undoArmed=Date.now();render();setTimeout(()=>{if(undoArmed&&Date.now()-undoArmed>=4000){undoArmed=0;render();}},4100);return;}
-  const e=l.pop();if(!l.length)delete P[n.iso];save();undoArmed=0;render();toast("Undid "+labelFor(e[0],null)+" ("+tod12(e[1])+")");}
+  const e=l.pop();if(!l.length)delete P[n.iso];save();undoArmed=0;render();syncSoon();toast("Undid "+labelFor(e[0],null)+" ("+tod12(e[1])+")");}
 function labelFor(k,n){return ({in:"Clock In",out:"Clock Out",bs:`Break${n?" "+n:""} Start`,be:`Break${n?" "+n:""} End`,lo:"Lunch Out",li:"Lunch In"})[k];}
 
 /* ---------- render ---------- */
@@ -336,7 +352,85 @@ function doImport(file){const fr=new FileReader();fr.onload=()=>{try{const j=JSO
     const src=j&&j.punches&&typeof j.punches==="object"?j.punches:j;const c=clean(src);
     if(!c||!Object.keys(c).length){toast("No punches found in that file");return;}
     const days=Object.keys(c).length;if(!confirm(`Import ${days} day(s) of punches? Matching dates on this phone will be replaced.`))return;
-    Object.assign(P,c);save();lastStateKey="";render();toast(`Imported ${days} day(s)`);}catch(e){toast("Not a valid JSON file");}};fr.readAsText(file);}
+    Object.assign(P,c);save();lastStateKey="";render();syncSoon();toast(`Imported ${days} day(s)`);}catch(e){toast("Not a valid JSON file");}};fr.readAsText(file);}
+
+/* ---------- cloud sync (private GitHub repo via contents API; token kept only in this phone's storage) ---------- */
+/* TimeClock sync merge (keep identical to pc/TimeClockSync.ps1 Merge-Punches3).
+   punches = {"yyyy-MM-dd":[[kind,sec],...]}. 3-way merge per date against the last synced base:
+   a day changed on one side only -> that side wins verbatim; changed on both -> multiset merge
+   (additions from both kept once, a removal on either side wins), then stable-sorted by seconds. */
+function tcMerge3(base, a, b) {
+  base = base || {}; a = a || {}; b = b || {};
+  const key = e => e[0] + ":" + e[1];
+  const eq = (x, y) => { x = x || []; y = y || []; if (x.length !== y.length) return false; for (let i = 0; i < x.length; i++) if (x[i][0] !== y[i][0] || x[i][1] !== y[i][1]) return false; return true; };
+  const cnt = l => { const m = new Map(); for (const e of l || []) m.set(key(e), (m.get(key(e)) || 0) + 1); return m; };
+  const out = {};
+  const days = Array.from(new Set([...Object.keys(base), ...Object.keys(a), ...Object.keys(b)])).sort();
+  for (const d of days) {
+    const B = base[d] || [], A = a[d] || [], C = b[d] || [];
+    let r;
+    if (eq(A, B)) r = C; else if (eq(C, B)) r = A; else if (eq(A, C)) r = A;
+    else {
+      const cB = cnt(B), cA = cnt(A), cC = cnt(C), order = [], seen = new Set(), items = new Map();
+      for (const e of [...A, ...C, ...B]) { const k = key(e); if (!seen.has(k)) { seen.add(k); order.push(k); items.set(k, [String(e[0]), e[1] | 0]); } }
+      r = [];
+      for (const k of order) {
+        const nb = cB.get(k) || 0, dA = (cA.get(k) || 0) - nb, dC = (cC.get(k) || 0) - nb;
+        let n = (dA > 0 && dC > 0) ? nb + Math.max(dA, dC) : (dA < 0 && dC < 0) ? nb + Math.min(dA, dC) : nb + dA + dC;
+        for (let i = 0; i < n; i++) r.push(items.get(k).slice());
+      }
+      r = r.map((e, i) => [e, i]).sort((x, y) => x[0][1] - y[0][1] || x[1] - y[1]).map(x => x[0]);
+    }
+    if (r && r.length) out[d] = r.map(e => [String(e[0]), e[1] | 0]);
+  }
+  return out;
+}
+function tcPunchJson(P) { const ks = Object.keys(P).filter(k => P[k] && P[k].length).sort();
+  return "{" + ks.map(k => JSON.stringify(k) + ":[" + P[k].map(e => `[${JSON.stringify(e[0])},${e[1] | 0}]`).join(",") + "]").join(",") + "}"; }
+
+
+const SYNC_CFG="tcl-sync-cfg", SYNC_BASE="tcl-sync-base", SYNC_FILE="timeclock-sync.json";
+let syncBusy=false, syncAgain=false, syncTimer=0, lastSync=null, syncErr="";
+function syncCfg(){try{const c=JSON.parse(localStorage.getItem(SYNC_CFG)||"null");return c&&c.token&&c.repo?c:null;}catch(e){return null;}}
+function b64utf8(s){return btoa(unescape(encodeURIComponent(s)));}
+function utf8b64(b){return decodeURIComponent(escape(atob(b.replace(/\s/g,""))));}
+async function gh(c,method,body){const url=(c.api||"https://api.github.com")+"/repos/"+c.repo+"/contents/"+(c.path||SYNC_FILE)+(method==="GET"?"?ref=main&t="+Date.now():"");
+  const r=await fetch(url,{method,cache:"no-store",headers:{"Authorization":"Bearer "+c.token,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28",...(body?{"Content-Type":"application/json"}:{})},body:body?JSON.stringify(body):undefined});
+  if(r.status===404&&method==="GET")return null;
+  if(!r.ok){const e=new Error(r.status===401?"token rejected (401)":r.status===403?"no access to repo (403)":r.status===404?"repo not found / no access (404)":"GitHub error "+r.status);e.status=r.status;throw e;}
+  return r.json();}
+async function syncNow(){const c=syncCfg();if(!c)return renderSync();if(!navigator.onLine){syncErr="offline – will sync when back online";return renderSync();}
+  if(syncBusy){syncAgain=true;return;}syncBusy=true;renderSync();
+  try{for(let attempt=0;attempt<3;attempt++){
+      const g=await gh(c,"GET");let R={},sha=null;
+      if(g){sha=g.sha;const j=JSON.parse(utf8b64(g.content).replace(/^\uFEFF/,""));R=clean(j.punches)||{};}
+      let S={};try{S=clean(JSON.parse(localStorage.getItem(SYNC_BASE)||"{}"))||{};}catch(e){}
+      load();const N=tcMerge3(S,P,R);
+      if(tcPunchJson(N)!==tcPunchJson(R)){const n=nowCT();
+        const doc='{"app":"TimeClock Live Sync","version":"'+VERSION+'","saved":"'+n.iso+" "+pad(n.h)+":"+pad(n.mi)+":"+pad(n.s)+'","by":"phone","punches":'+tcPunchJson(N)+"}";
+        try{await gh(c,"PUT",{message:"phone sync "+n.iso+" "+pad(n.h)+":"+pad(n.mi),content:b64utf8(doc),branch:"main",...(sha?{sha}:{})});}
+        catch(e){if(e.status===409||e.status===422)continue;throw e;}}
+      if(tcPunchJson(N)!==tcPunchJson(P)){P=N;save();lastStateKey="";render();}
+      localStorage.setItem(SYNC_BASE,tcPunchJson(N));lastSync=Date.now();syncErr="";break;}
+  }catch(e){syncErr=e.message||String(e);}
+  syncBusy=false;renderSync();if(syncAgain){syncAgain=false;syncNow();}}
+function syncSoon(){if(!syncCfg())return;clearTimeout(syncTimer);syncTimer=setTimeout(syncNow,800);}
+function renderSync(){const c=syncCfg();$("syncSetup").style.display=c?"none":"";$("syncOn").style.display=c?"flex":"none";
+  const dot=$("syncDot"),st=$("syncSt"),lbl=$("syncLbl");
+  if(!c){dot.className="";lbl.textContent="Off";st.className="";st.textContent="Not set up. Punches stay on this phone.";return;}
+  if(syncBusy){dot.className="busy";lbl.textContent="Syncing";return;}
+  if(syncErr){dot.className="err";lbl.textContent="Error";st.className="err";st.textContent="Sync: "+syncErr;return;}
+  dot.className=lastSync?"ok":"";lbl.textContent=lastSync?"On":"Waiting";st.className=lastSync?"ok":"";
+  const t=lastSync?nowCT():null;st.textContent=lastSync?"Synced "+tod12(Math.floor((lastSync-Date.now())/1000)+t.sec)+" · "+c.repo:"Connecting to "+c.repo+"…";}
+$("bSyncSave").onclick=()=>{const repo=$("syncRepo").value.trim(),token=$("syncTok").value.trim();
+  if(!/^[\w.-]+\/[\w.-]+$/.test(repo)||token.length<20){toast("Enter owner/repo and the token");return;}
+  const prev=(()=>{try{return JSON.parse(localStorage.getItem(SYNC_CFG)||"{}");}catch(e){return {};}})();
+  localStorage.setItem(SYNC_CFG,JSON.stringify({repo,token,api:prev.api,path:prev.path}));$("syncTok").value="";syncErr="";lastSync=null;syncNow();};
+$("bSyncNow").onclick=()=>syncNow();
+$("bSyncOff").onclick=()=>{if(!confirm("Disconnect cloud sync? Punches stay on this phone; the token is erased from it."))return;
+  localStorage.removeItem(SYNC_CFG);localStorage.removeItem(SYNC_BASE);syncErr="";lastSync=null;renderSync();};
+window.addEventListener("online",syncSoon);
+setInterval(()=>{if(!document.hidden)syncNow();},30000);
 
 let tt=0;function toast(s){const t=$("toast");t.textContent=s;t.classList.add("on");clearTimeout(tt);tt=setTimeout(()=>t.classList.remove("on"),2600);}
 
@@ -348,9 +442,9 @@ $("bClose").onclick=()=>$("jsonBox").classList.remove("on");
 $("bCopy").onclick=()=>{const t=$("jsonTxt");(navigator.clipboard?navigator.clipboard.writeText(t.value):Promise.reject()).then(()=>toast("Copied"),()=>{t.select();document.execCommand("copy");toast("Copied");});};
 document.addEventListener("touchstart",unlockAudio,{passive:true});document.addEventListener("click",unlockAudio);
 window.addEventListener("storage",e=>{if(e.key===KEY){load();lastStateKey="";render();}});
-document.addEventListener("visibilitychange",()=>{if(!document.hidden){load();lastStateKey="";render();}});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden){load();lastStateKey="";render();syncNow();}});
 
-load();render();
+load();render();renderSync();syncNow();
 setInterval(render,1000);
 if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>

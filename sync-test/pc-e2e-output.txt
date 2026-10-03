@@ -1,0 +1,13 @@
+PASS first run creates cloud file with PC punches
+PASS cloud file has no alerts/sync topics or profile
+PASS desktop running: data file untouched (phone punch queued)
+PASS cloud = PC lunch + phone break merged
+PASS queued phone punch not treated as a PC deletion
+PASS desktop closed: phone punch written into data file
+PASS other fields preserved byte-for-byte
+PASS data file still valid JSON
+PASS .bak written
+PASS phone undo propagates to PC file
+PASS log has no token/topic
+PASS bad token fails without touching file
+pc e2e: 12 passed, 0 failed

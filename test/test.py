@@ -24,7 +24,7 @@ try:
     pg.goto('http://127.0.0.1:8799/index.html'); pg.wait_for_timeout(300)
     btns=lambda: pg.eval_on_selector_all('#acts .btn','e=>e.map(x=>x.textContent)')
     chk('start shows only Clock In',btns()==['Clock In'],btns())
-    chk('footer',pg.inner_text('footer')=='DESIGN BY VAN\nv1.1.0 · Oct 3, 2026',pg.inner_text('footer'))
+    chk('footer',pg.inner_text('footer')=='DESIGN BY VAN\nv1.2.0 · Oct 3, 2026',pg.inner_text('footer'))
     chk('footer font Oswald',pg.evaluate("document.fonts.check('700 30px OswaldTC')"))
     chk('pay period range',pg.inner_text('#ppRange')=='9/26/2026 – 10/9/2026',pg.inner_text('#ppRange'))
     # 9/28 8:00-16:30 minus 30 lunch = 8:00; 9/29 7:58->... (8:02-16:30 -30)=7:58 ; 9/30 8:00; 10/1 7:30; 10/2 8:00 => 39:28
