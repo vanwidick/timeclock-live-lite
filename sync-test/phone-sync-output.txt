@@ -6,13 +6,14 @@ PASS phone pulled PC clock-in (shows break/lunch/out) :: ['Break 1 Start', 'Lunc
 PASS token not shown/kept in input
 PASS phone punch pushed to cloud :: [['in', 28800], ['bs', 34202]]
 PASS cloud doc marked by phone
-PASS PC running: file not touched
-PASS PC closed: phone break written into data file :: [['in', 28800], ['bs', 34202]]
+PASS desktop running (default live mode): phone break written into data file :: [['in', 28800], ['bs', 34202]]
 PASS alerts.topic still in file and never in cloud
 PASS desktop Break End reached phone :: ['Break 2 Start', 'Lunch Out', 'Clock Out']
 PASS phone timeline shows PC punch
 PASS undo synced to cloud
 PASS undo reached PC file :: [['in', 28800], ['bs', 34202]]
+PASS footer v1.2.1 :: DESIGN BY VAN
+v1.2.1 · Oct 3, 2026
 PASS token not in export
 PASS history day from PC visible on phone :: Today 10/3
 1:30

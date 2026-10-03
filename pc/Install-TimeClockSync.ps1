@@ -10,7 +10,7 @@
 #>
 param(
     [string]$Repo = 'vanwidick/timeclock-sync',
-    [ValidateSet('WhenClosed','Always','Never')][string]$FileWrite = 'WhenClosed',
+    [ValidateSet('Always','WhenClosed','Never')][string]$FileWrite = 'Always',   # needs TimeClock Live v1.0.2+ (reloads the file); WhenClosed for older versions
     [string]$DataPath = (Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'TimeClockLive\timeclock-data.json'),
     [switch]$Uninstall
 )

@@ -164,7 +164,7 @@ footer .ver{color:var(--dim);font-size:12px;margin-top:4px;letter-spacing:.04em}
 
 <footer>
   <div class="by">Design by Van</div>
-  <div class="ver">v1.2.0 · Oct 3, 2026</div>
+  <div class="ver">v1.2.1 · Oct 3, 2026</div>
 </footer>
 
 <div id="jsonBox"><textarea id="jsonTxt" readonly></textarea>
@@ -173,7 +173,7 @@ footer .ver{color:var(--dim);font-size:12px;margin-top:4px;letter-spacing:.04em}
 
 <script>
 "use strict";
-const APP="TimeClock Live Lite", VERSION="1.2.0", TZ="America/Chicago", KEY="punches";
+const APP="TimeClock Live Lite", VERSION="1.2.1", TZ="America/Chicago", KEY="punches";
 const BREAK_SEC=15*60, BREAK_WARN=3*60, LUNCH_SEC=30*60, LUNCH_WARN=5*60;
 const PP_ANCHOR="2026-09-26", PP_DAYS=14;
 const $=id=>document.getElementById(id);
@@ -385,6 +385,17 @@ function tcMerge3(base, a, b) {
   }
   return out;
 }
+/* At most 2 breaks a day. A 3rd+ "bs" is dropped; if no break was open it is dropped together with the "be" that closes it
+   (if a break was still open, e.g. break 2 started on both devices, that "be" still ends the open break and is kept). */
+function tcLimitBreaks(P) { const out = {};
+  for (const d of Object.keys(P || {})) { let n = 0, open = false, skipBe = false; const l = [];
+    for (const e of P[d]) { const k = e[0];
+      if (k === "bs") { n++; if (n > 2) { if (!open) skipBe = true; continue; } open = true; skipBe = false; }
+      else if (k === "be") { if (skipBe) { skipBe = false; continue; } open = false; }
+      else { open = false; skipBe = false; }
+      l.push([k, e[1] | 0]); }
+    if (l.length) out[d] = l; }
+  return out; }
 function tcPunchJson(P) { const ks = Object.keys(P).filter(k => P[k] && P[k].length).sort();
   return "{" + ks.map(k => JSON.stringify(k) + ":[" + P[k].map(e => `[${JSON.stringify(e[0])},${e[1] | 0}]`).join(",") + "]").join(",") + "}"; }
 
@@ -405,7 +416,7 @@ async function syncNow(){const c=syncCfg();if(!c)return renderSync();if(!navigat
       const g=await gh(c,"GET");let R={},sha=null;
       if(g){sha=g.sha;const j=JSON.parse(utf8b64(g.content).replace(/^\uFEFF/,""));R=clean(j.punches)||{};}
       let S={};try{S=clean(JSON.parse(localStorage.getItem(SYNC_BASE)||"{}"))||{};}catch(e){}
-      load();const N=tcMerge3(S,P,R);
+      load();const N=tcLimitBreaks(tcMerge3(S,P,R));
       if(tcPunchJson(N)!==tcPunchJson(R)){const n=nowCT();
         const doc='{"app":"TimeClock Live Sync","version":"'+VERSION+'","saved":"'+n.iso+" "+pad(n.h)+":"+pad(n.mi)+":"+pad(n.s)+'","by":"phone","punches":'+tcPunchJson(N)+"}";
         try{await gh(c,"PUT",{message:"phone sync "+n.iso+" "+pad(n.h)+":"+pad(n.mi),content:b64utf8(doc),branch:"main",...(sha?{sha}:{})});}

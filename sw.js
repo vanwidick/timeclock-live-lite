@@ -1,5 +1,5 @@
 /* TimeClock Live Lite service worker - offline app shell */
-const CACHE = "tcl-v1.2.0";
+const CACHE = "tcl-v1.2.1";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {

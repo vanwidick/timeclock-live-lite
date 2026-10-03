@@ -164,7 +164,7 @@ footer .ver{color:var(--dim);font-size:12px;margin-top:4px;letter-spacing:.04em}
 
 <footer>
   <div class="by">Design by Van</div>
-  <div class="ver">v1.2.0 · Oct 3, 2026</div>
+  <div class="ver">v1.2.1 · Oct 3, 2026</div>
 </footer>
 
 <div id="jsonBox"><textarea id="jsonTxt" readonly></textarea>
@@ -173,7 +173,7 @@ footer .ver{color:var(--dim);font-size:12px;margin-top:4px;letter-spacing:.04em}
 
 <script>
 "use strict";
-const APP="TimeClock Live Lite", VERSION="1.2.0", TZ="America/Chicago", KEY="punches";
+const APP="TimeClock Live Lite", VERSION="1.2.1", TZ="America/Chicago", KEY="punches";
 const BREAK_SEC=15*60, BREAK_WARN=3*60, LUNCH_SEC=30*60, LUNCH_WARN=5*60;
 const PP_ANCHOR="2026-09-26", PP_DAYS=14;
 const $=id=>document.getElementById(id);
@@ -372,7 +372,7 @@ async function syncNow(){const c=syncCfg();if(!c)return renderSync();if(!navigat
       const g=await gh(c,"GET");let R={},sha=null;
       if(g){sha=g.sha;const j=JSON.parse(utf8b64(g.content).replace(/^\uFEFF/,""));R=clean(j.punches)||{};}
       let S={};try{S=clean(JSON.parse(localStorage.getItem(SYNC_BASE)||"{}"))||{};}catch(e){}
-      load();const N=tcMerge3(S,P,R);
+      load();const N=tcLimitBreaks(tcMerge3(S,P,R));
       if(tcPunchJson(N)!==tcPunchJson(R)){const n=nowCT();
         const doc='{"app":"TimeClock Live Sync","version":"'+VERSION+'","saved":"'+n.iso+" "+pad(n.h)+":"+pad(n.mi)+":"+pad(n.s)+'","by":"phone","punches":'+tcPunchJson(N)+"}";
         try{await gh(c,"PUT",{message:"phone sync "+n.iso+" "+pad(n.h)+":"+pad(n.mi),content:b64utf8(doc),branch:"main",...(sha?{sha}:{})});}

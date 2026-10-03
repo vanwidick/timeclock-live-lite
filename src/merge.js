@@ -28,6 +28,17 @@ function tcMerge3(base, a, b) {
   }
   return out;
 }
+/* At most 2 breaks a day. A 3rd+ "bs" is dropped; if no break was open it is dropped together with the "be" that closes it
+   (if a break was still open, e.g. break 2 started on both devices, that "be" still ends the open break and is kept). */
+function tcLimitBreaks(P) { const out = {};
+  for (const d of Object.keys(P || {})) { let n = 0, open = false, skipBe = false; const l = [];
+    for (const e of P[d]) { const k = e[0];
+      if (k === "bs") { n++; if (n > 2) { if (!open) skipBe = true; continue; } open = true; skipBe = false; }
+      else if (k === "be") { if (skipBe) { skipBe = false; continue; } open = false; }
+      else { open = false; skipBe = false; }
+      l.push([k, e[1] | 0]); }
+    if (l.length) out[d] = l; }
+  return out; }
 function tcPunchJson(P) { const ks = Object.keys(P).filter(k => P[k] && P[k].length).sort();
   return "{" + ks.map(k => JSON.stringify(k) + ":[" + P[k].map(e => `[${JSON.stringify(e[0])},${e[1] | 0}]`).join(",") + "]").join(",") + "}"; }
-if (typeof module !== "undefined") module.exports = { tcMerge3, tcPunchJson };
+if (typeof module !== "undefined") module.exports = { tcMerge3, tcLimitBreaks, tcPunchJson };

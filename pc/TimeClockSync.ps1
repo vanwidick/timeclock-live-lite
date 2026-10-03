@@ -1,14 +1,18 @@
 <#
-  TimeClock Sync v1.0.0 (companion for TimeClock Live - does NOT modify TimeClockLive.ps1)
+  TimeClock Sync v1.1.0 (companion for TimeClock Live - does NOT modify TimeClockLive.ps1)
   Two-way sync of the punch log between the PC and the phone app (TimeClock Live Lite) through a PRIVATE GitHub repo.
+  Requires TimeClock Live v1.0.2+ (reloads timeclock-data.json on change and 3-way merges punches from disk before saving).
 
-  * Reads   <DataPath>  (timeclock-data.json written by TimeClockLive.ps1) - only the "punches" object is used.
-  * Pushes  punches to  https://api.github.com/repos/<Repo>/contents/<RemotePath>  (private repo, fine-grained token).
-  * Pulls   phone punches back and merges them by date (3-way merge against the last synced state).
-  * Writes  phone punches into <DataPath> ONLY while TimeClock Live is NOT running (default -FileWrite WhenClosed),
-            because TimeClockLive.ps1 keeps punches in memory, never re-reads the file, and rewrites it on every punch.
-            Until then they are queued (they are safe in the cloud copy) and land the next time the app is closed.
-            Only the "punches" value in the file is replaced; profile / pto / alerts / sync / display are left byte-for-byte.
+  * Reads   <DataPath> (timeclock-data.json) when its LastWriteTime/size changes - only "punches" is used.
+            Opened with FileShare Read|Write|Delete, never held open.
+  * Pushes  punches to https://api.github.com/repos/<Repo>/contents/<RemotePath> (private repo, fine-grained token).
+  * Pulls   phone punches (conditional GET, ETag) and merges them by date (3-way against the last synced state).
+  * Writes  merged punches back live (default -FileWrite Always): re-reads the file right before writing (if the desktop
+            changed it meanwhile, re-merges first), replaces ONLY the "punches" value (every other key - profile, pto, alerts,
+            display, sync, days... - is written back byte-for-byte), writes UTF-8 to timeclock-data.json.lite.tmp in the same
+            folder and swaps it in with File.Replace (previous file kept as timeclock-data.json.bak, like the app does).
+            Its own write is remembered so it is not pushed back (no ping-pong).
+  * Punch rules: Central yyyy-MM-dd keys, seconds 0-86399, kinds in/out/bs/be/lo/li, at most 2 breaks a day.
   * Never uploads anything except punches (no profile, no alerts.topic, no sync topic). Never logs the token.
 
   Token: stored with Windows DPAPI (current user only) in %LOCALAPPDATA%\TimeClockSync\token.dat by Install-TimeClockSync.ps1.
@@ -21,14 +25,16 @@ param(
     [string]$Branch     = 'main',
     [string]$ApiBase    = 'https://api.github.com',
     [string]$StateDir   = $(if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'TimeClockSync' } else { Join-Path $HOME '.timeclocksync' }),
-    [int]$IntervalSec   = 20,
-    [ValidateSet('WhenClosed','Always','Never')][string]$FileWrite = 'WhenClosed',
+    [int]$IntervalSec   = 10,
+    [ValidateSet('Always','WhenClosed','Never')][string]$FileWrite = 'Always',   # WhenClosed = legacy mode for TimeClock Live < 1.0.2
     [switch]$Once,
+    [int]$Cycles = 0,                # 0 = run forever (test hook: stop after N cycles)
     [switch]$AssumeDesktopRunning,   # test hook
-    [switch]$AssumeDesktopClosed     # test hook
+    [switch]$AssumeDesktopClosed,    # test hook
+    [string]$TestPreWriteHook = ''   # test hook: script run just before the pre-write re-read (simulates a desktop save racing us)
 )
 $ErrorActionPreference = 'Stop'
-$SyncVersion = '1.0.0'
+$SyncVersion = '1.1.0'
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch {}
 if (-not (Test-Path -LiteralPath $StateDir)) { New-Item -ItemType Directory -Path $StateDir -Force | Out-Null }
 $StatePath = Join-Path $StateDir 'state.json'; $LogPath = Join-Path $StateDir 'sync-log.txt'; $TokenPath = Join-Path $StateDir 'token.dat'
@@ -53,6 +59,7 @@ function ConvertTo-PunchTable($obj) {
     if ($null -eq $obj) { return $t }
     foreach ($pr in $obj.PSObject.Properties) {
         if ($pr.Name -notmatch '^\d{4}-\d{2}-\d{2}$') { continue }
+        $dt = [datetime]::MinValue; if (-not [datetime]::TryParseExact($pr.Name, 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$dt)) { continue }
         $l = New-Object System.Collections.ArrayList
         foreach ($e in @($pr.Value)) { if ($null -eq $e) { continue }; $e = @($e); if ($e.Count -lt 2) { continue }
             $k = [string]$e[0]; if ($Kinds -notcontains $k) { continue }
@@ -106,6 +113,20 @@ function Merge-Punches3($pBase, $pA, $pB) {   # (PowerShell names are case-insen
     return $out
 }
 
+# At most 2 breaks a day (same rules as tcLimitBreaks in the phone app). A 3rd+ "bs" is dropped; if no break was open it is
+# dropped together with the "be" that closes it (if a break was still open, that "be" still ends it and is kept).
+function Limit-Breaks($t) {
+    $out = @{}
+    foreach ($d in @($t.Keys)) { $n = 0; $open = $false; $skipBe = $false; $l = New-Object System.Collections.ArrayList
+        foreach ($e in @($t[$d])) { $k = [string]$e[0]
+            if ($k -eq 'bs') { $n++; if ($n -gt 2) { if (-not $open) { $skipBe = $true }; continue }; $open = $true; $skipBe = $false }
+            elseif ($k -eq 'be') { if ($skipBe) { $skipBe = $false; continue }; $open = $false }
+            else { $open = $false; $skipBe = $false }
+            [void]$l.Add(@($k, [int]$e[1])) }
+        if ($l.Count) { $out[$d] = $l } }
+    return $out
+}
+
 # ---------------------------------------------------------------- state (last synced canonical S, and file base FB)
 function Read-State {
     $s = @{ S = @{}; FB = @{}; fileHash = '' }
@@ -119,11 +140,17 @@ function Save-State($st) {
 }
 
 # ---------------------------------------------------------------- local data file
+function Get-FileSig { $fi = New-Object IO.FileInfo $DataPath; $fi.Refresh(); if (-not $fi.Exists) { return '' }; return ([string]$fi.LastWriteTimeUtc.Ticks + ':' + [string]$fi.Length) }
+function Read-Shared([string]$path) {   # never blocks the app: share Read|Write|Delete, closed right away
+    $fs = New-Object IO.FileStream($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+    try { $sr = New-Object IO.StreamReader($fs, (New-Object Text.UTF8Encoding $false), $true); try { return $sr.ReadToEnd() } finally { $sr.Dispose() } } finally { $fs.Dispose() }
+}
 function Read-DataFile {
     for ($try = 0; $try -lt 5; $try++) {
-        try { $raw = [IO.File]::ReadAllText($DataPath, [Text.Encoding]::UTF8)
+        try { $sig = Get-FileSig; $raw = Read-Shared $DataPath
             $j = $raw.TrimStart([char]0xFEFF) | ConvertFrom-Json
-            return @{ Raw = $raw; Punches = (ConvertTo-PunchTable $j.punches) } }
+            if ($null -eq $j) { throw 'empty' }
+            return @{ Raw = $raw; Sig = $sig; Punches = (ConvertTo-PunchTable $j.punches) } }
         catch { Start-Sleep -Milliseconds 300 } }
     throw ('cannot read ' + $DataPath)
 }
@@ -132,34 +159,47 @@ function Test-DesktopRunning {
     try { $p = @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe' OR Name='pwsh.exe'" -ErrorAction Stop | Where-Object { $_.CommandLine -match 'TimeClockLive\.ps1' }); return ($p.Count -gt 0) }
     catch { return $true }   # unsure -> treat as running (never risk a clobber)
 }
-function Write-DataFilePunches([string]$expectRaw, $punches) {
-    $cur = [IO.File]::ReadAllText($DataPath, [Text.Encoding]::UTF8)
-    if ($cur -ne $expectRaw) { Write-Log 'file changed while syncing; retry next cycle'; return $false }
-    $pj = ConvertTo-PunchJson $punches
-    $rx = [regex]'"punches"\s*:\s*\{[^{}]*\}'   # punch log contains only [] inside, so this is the whole value
-    if (-not $rx.IsMatch($cur)) { Write-Log 'punches block not found in data file; not writing'; return $false }
-    $new = $rx.Replace($cur, ('"punches":  ' + $pj).Replace('$', '$$'), 1)
-    $tmp = $DataPath + '.sync.tmp'
+$PunchRx = [regex]'"punches"\s*:\s*\{[^{}]*\}'   # the punch log holds only [] inside, so this is the whole value
+# Replace only the "punches" value of $raw; atomic swap via temp file in the same folder + File.Replace. Returns new sig or $null.
+function Write-DataFilePunches([string]$raw, $punches) {
+    if (-not $PunchRx.IsMatch($raw)) { Write-Log 'punches block not found in data file; not writing'; return $null }
+    $new = $PunchRx.Replace($raw, ('"punches":  ' + (ConvertTo-PunchJson $punches)).Replace('$', '$$'), 1)
+    try { [void]($new.TrimStart([char]0xFEFF) | ConvertFrom-Json) } catch { Write-Log 'refusing to write: result is not valid JSON'; return $null }
+    $tmp = $DataPath + '.lite.tmp'; $bak = $DataPath + '.bak'
     [IO.File]::WriteAllText($tmp, $new, (New-Object Text.UTF8Encoding $false))
-    Copy-Item -LiteralPath $DataPath -Destination ($DataPath + '.bak') -Force
-    Move-Item -LiteralPath $tmp -Destination $DataPath -Force
-    return $true
+    for ($try = 0; $try -lt 10; $try++) {
+        try { [IO.File]::Replace($tmp, $DataPath, $bak, $true); return (Get-FileSig) }
+        catch { Start-Sleep -Milliseconds 150 } }
+    Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+    Write-Log 'could not replace data file (busy); will retry'; return $null
 }
 
 # ---------------------------------------------------------------- GitHub contents API
 function Get-HttpStatus($err) { try { return [int]$err.Exception.Response.StatusCode } catch { return 0 } }
-function Invoke-Gh([string]$method, [string]$url, $body) {
+function Invoke-Gh([string]$method, [string]$url, $body, $extra) {
     $h = @{ Authorization = ('Bearer ' + (Get-Token)); Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28'; 'User-Agent' = 'TimeClockSync/' + $SyncVersion }
+    if ($extra) { foreach ($k in $extra.Keys) { $h[$k] = $extra[$k] } }
     if ($null -ne $body) { return Invoke-RestMethod -Method $method -Uri $url -Headers $h -Body ([Text.Encoding]::UTF8.GetBytes(($body | ConvertTo-Json -Depth 4 -Compress))) -ContentType 'application/json; charset=utf-8' -TimeoutSec 30 }
     return Invoke-RestMethod -Method $method -Uri $url -Headers $h -TimeoutSec 30
 }
+$script:RemoteCache = $null   # last GET result + ETag; a 304 does not count against the GitHub rate limit
 function Get-Remote {
-    $url = $ApiBase + '/repos/' + $Repo + '/contents/' + $RemotePath + '?ref=' + $Branch + '&t=' + [DateTime]::UtcNow.Ticks
-    try { $r = Invoke-Gh 'GET' $url $null }
-    catch { if ((Get-HttpStatus $_) -eq 404) { return @{ Sha = $null; Punches = @{} } }; throw }
+    $url = $ApiBase + '/repos/' + $Repo + '/contents/' + $RemotePath + '?ref=' + $Branch
+    $hdr = $null; if ($script:RemoteCache -and $script:RemoteCache.ETag) { $hdr = @{ 'If-None-Match' = $script:RemoteCache.ETag } }
+    $h = @{ Authorization = ('Bearer ' + (Get-Token)); Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28'; 'User-Agent' = 'TimeClockSync/' + $SyncVersion }
+    if ($hdr) { $h['If-None-Match'] = $hdr['If-None-Match'] }
+    try { $resp = Invoke-WebRequest -Method GET -Uri $url -Headers $h -TimeoutSec 30 -UseBasicParsing }
+    catch { $c = Get-HttpStatus $_
+        if ($c -eq 304 -and $script:RemoteCache) { return $script:RemoteCache }
+        if ($c -eq 404) { $script:RemoteCache = $null; return @{ Sha = $null; Punches = @{}; ETag = $null } }; throw }
+    if ([int]$resp.StatusCode -eq 304 -and $script:RemoteCache) { return $script:RemoteCache }
+    $body = $resp.Content; if ($body -is [byte[]]) { $body = [Text.Encoding]::UTF8.GetString($body) }
+    $r = $body | ConvertFrom-Json
     $txt = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(([string]$r.content -replace '\s', '')))
     $j = $txt.TrimStart([char]0xFEFF) | ConvertFrom-Json
-    return @{ Sha = [string]$r.sha; Punches = (ConvertTo-PunchTable $j.punches) }
+    $et = $null; try { $et = [string]@($resp.Headers['ETag'])[0] } catch {}
+    $script:RemoteCache = @{ Sha = [string]$r.sha; Punches = (ConvertTo-PunchTable $j.punches); ETag = $et }
+    return $script:RemoteCache
 }
 function Set-Remote($punches, $sha) {
     $doc = '{"app":"TimeClock Live Sync","version":"' + $SyncVersion + '","saved":"' + (Get-Date).ToString('yyyy-MM-dd HH:mm:ss') + '","by":"pc","punches":' + (ConvertTo-PunchJson $punches) + '}'
@@ -170,22 +210,31 @@ function Set-Remote($punches, $sha) {
 }
 
 # ---------------------------------------------------------------- one sync cycle
+# State: S = last synced (canonical) punches, FB = punches last seen in / written to the data file, FileSig = its LastWriteTime:size.
 function Invoke-SyncCycle($st) {
-    for ($attempt = 1; $attempt -le 3; $attempt++) {
-        $file = Read-DataFile; $F = $file.Punches
+    for ($attempt = 1; $attempt -le 4; $attempt++) {
+        $sig = Get-FileSig; if (-not $sig) { throw ('data file not found: ' + $DataPath) }
+        if ($sig -ne $st.FileSig -or $null -eq $st.FileRaw) { $file = Read-DataFile; $st.FileRaw = $file.Raw; $F = $file.Punches; $fileChanged = ($sig -ne $st.FileSig) }
+        else { $F = $st.FB; $fileChanged = $false }   # unchanged since we last read/wrote it (incl. our own write) -> nothing new from the desktop
         $rem = Get-Remote; $R = $rem.Punches
-        $Sp = Merge-Punches3 $st.FB $F $st.S      # apply the desktop's changes since last cycle onto the synced state
-        $N  = Merge-Punches3 $st.S $Sp $R          # then merge with the cloud (phone) copy
+        $Sp = Merge-Punches3 $st.FB $F $st.S                    # the desktop's changes since last cycle, applied onto the synced state
+        $N  = Limit-Breaks (Merge-Punches3 $st.S $Sp $R)        # merged with the cloud (phone) copy
         if (-not (Test-PunchEq $N $R)) {
-            try { [void](Set-Remote $N $rem.Sha); Write-Log 'pushed punches to cloud' }
-            catch { $c = Get-HttpStatus $_; if ($c -eq 409 -or $c -eq 422) { Write-Log ('cloud changed meanwhile (' + $c + '), retrying'); continue }; throw }
+            try { [void](Set-Remote $N $rem.Sha); $script:RemoteCache = $null; Write-Log ('pushed punches to cloud' + $(if ($fileChanged) { ' (desktop change)' } else { '' })) }
+            catch { $c = Get-HttpStatus $_; if ($c -eq 409 -or $c -eq 422) { $script:RemoteCache = $null; Write-Log ('cloud changed meanwhile (' + $c + '), re-merging'); continue }; throw }
         }
         if (-not (Test-PunchEq $N $F)) {
             $can = $false
             if ($FileWrite -eq 'Always') { $can = $true } elseif ($FileWrite -eq 'WhenClosed') { $can = -not (Test-DesktopRunning) }
-            if ($can -and (Write-DataFilePunches $file.Raw $N)) { $st.FB = $N; Write-Log 'wrote phone punches into timeclock-data.json' }
-            else { $st.FB = $F; if (-not $st.Queued) { Write-Log 'phone punches waiting: TimeClock Live is running (they are kept in the cloud and written when it is closed)' }; $st.Queued = $true }
-        } else { $st.FB = $F; $st.Queued = $false }
+            if (-not $can) { $st.FB = $F; $st.FileSig = $sig; $st.S = $N; Save-State $st; return $true }
+            # re-read immediately before writing; if the desktop saved meanwhile, merge that first (next attempt)
+            if ($TestPreWriteHook -and -not $script:HookRan) { $script:HookRan = $true; & $TestPreWriteHook }
+            $now = Read-DataFile
+            if (-not (Test-PunchEq $now.Punches $F)) { $st.FB = $F; $st.S = $N; $st.FileSig = '#changed'; Write-Log 'desktop saved meanwhile; re-merging before write'; continue }
+            $newSig = Write-DataFilePunches $now.Raw $N
+            if ($newSig) { $st.FB = $N; $st.FileSig = $newSig; $st.FileRaw = $null; Write-Log 'wrote cloud punches into timeclock-data.json' }
+            else { $st.FB = $F; $st.FileSig = '#retry' }
+        } else { $st.FB = $F; $st.FileSig = $sig }
         $st.S = $N; Save-State $st
         return $true
     }
@@ -193,11 +242,12 @@ function Invoke-SyncCycle($st) {
 }
 
 Write-Log ('TimeClock Sync v' + $SyncVersion + ' start; data=' + $DataPath + ' repo=' + $Repo + '/' + $RemotePath + ' fileWrite=' + $FileWrite)
-$st = Read-State; $st.Queued = $false
-$lastErr = ''
+$st = Read-State; $st.FileSig = ''; $st.FileRaw = $null
+$lastErr = ''; $n = 0
 while ($true) {
     try { [void](Invoke-SyncCycle $st); $lastErr = '' }
     catch { $m = $_.Exception.Message; if ($m -ne $lastErr) { Write-Log ('sync error: ' + $m) }; $lastErr = $m; if ($Once) { throw } }
     if ($Once) { break }
+    $n++; if ($Cycles -gt 0 -and $n -ge $Cycles) { break }
     Start-Sleep -Seconds $IntervalSec
 }

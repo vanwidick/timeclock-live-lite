@@ -17,7 +17,7 @@ def pc(*extra):
     return r.returncode
 def filep(): return json.load(open(DATA))['punches']
 try:
-  pc('-AssumeDesktopRunning'); chk('PC pushed desktop punches to cloud',remote()['punches']['2026-10-03']==[['in',28800]])
+  pc(); chk('PC pushed desktop punches to cloud',remote()['punches']['2026-10-03']==[['in',28800]])
   with sync_playwright() as p:
     b=p.chromium.launch(channel='chrome',headless=True)
     ctx=b.new_context(viewport={'width':360,'height':780},device_scale_factor=3,is_mobile=True,has_touch=True,service_workers='block',accept_downloads=True)
@@ -37,20 +37,20 @@ try:
     pg.click('text=Break 1 Start'); pg.wait_for_timeout(1500)
     rp=remote()['punches']['2026-10-03']; chk('phone punch pushed to cloud',[e[0] for e in rp]==['in','bs'],rp)
     chk('cloud doc marked by phone',remote()['by']=='phone')
-    pc('-AssumeDesktopRunning'); chk('PC running: file not touched',filep()['2026-10-03']==[['in',28800]])
-    pc('-AssumeDesktopClosed'); chk('PC closed: phone break written into data file',[e[0] for e in filep()['2026-10-03']]==['in','bs'],filep()['2026-10-03'])
+    pc(); chk('desktop running (default live mode): phone break written into data file',[e[0] for e in filep()['2026-10-03']]==['in','bs'],filep()['2026-10-03'])
     chk('alerts.topic still in file and never in cloud','SECRETTOPIC' in open(DATA).read() and 'SECRET' not in json.dumps(remote()))
     # desktop (closed->reopened) ends the break; PC sync pushes; phone pulls
     j=json.load(open(DATA)); j['punches']['2026-10-03'].append(['be',35100]); s=open(DATA).read()
     old='"2026-10-03":'+json.dumps(filep()['2026-10-03'],separators=(',',':')); assert old in s
     open(DATA,'w').write(s.replace(old,'"2026-10-03":'+json.dumps(j['punches']['2026-10-03'],separators=(',',':'))))
-    pc('-AssumeDesktopRunning'); pg.click('#bSyncNow'); pg.wait_for_timeout(1000)
+    pc(); pg.click('#bSyncNow'); pg.wait_for_timeout(1000)
     chk('desktop Break End reached phone',btns()==['Break 2 Start','Lunch Out','Clock Out'],btns())
     chk('phone timeline shows PC punch','Break 1 End' in pg.inner_text('#tl'))
     # phone undo of Break 1 End -> cloud -> PC file
     pg.click('#bUndo'); pg.click('#bUndo'); pg.wait_for_timeout(1500)
     chk('undo synced to cloud',[e[0] for e in remote()['punches']['2026-10-03']]==['in','bs'])
-    pc('-AssumeDesktopClosed'); chk('undo reached PC file',[e[0] for e in filep()['2026-10-03']]==['in','bs'],filep()['2026-10-03'])
+    pc(); chk('undo reached PC file',[e[0] for e in filep()['2026-10-03']]==['in','bs'],filep()['2026-10-03'])
+    chk('footer v1.2.1',pg.inner_text('footer').endswith('v1.2.1 · Oct 3, 2026'),pg.inner_text('footer'))
     with pg.expect_download() as d: pg.click('#bExport')
     chk('token not in export',b'test-token-0123456789abcdef' not in open(d.value.path(),'rb').read())
     chk('history day from PC visible on phone','Fri 10/2\n8:00' in pg.inner_text('#hist'),pg.inner_text('#hist'))

@@ -1,13 +1,25 @@
-PASS first run creates cloud file with PC punches
-PASS cloud file has no alerts/sync topics or profile
-PASS desktop running: data file untouched (phone punch queued)
-PASS cloud = PC lunch + phone break merged
-PASS queued phone punch not treated as a PC deletion
-PASS desktop closed: phone punch written into data file
-PASS other fields preserved byte-for-byte
-PASS data file still valid JSON
-PASS .bak written
-PASS phone undo propagates to PC file
+PASS first run pushes desktop punches
+PASS cloud has only punches (no topics/profile/pto)
+PASS idle cycles: no push
+  (304s: 2)
+PASS idle cycles use conditional GET (304, not rate-limited)
+PASS LIVE: phone punch written while desktop runs
+PASS rule 1: every non-punch byte unchanged (profile/pto/alerts/display/sync/days)
+PASS rule 4: format "punches": {"yyyy-MM-dd":[["in",n],...]}
+PASS rule 2: no temp file left, .bak is valid JSON (previous version)
+PASS file is UTF-8 without BOM
+PASS rule 7: own write not pushed back
+PASS rule 7: desktop re-save with same punches -> no push
+PASS rule 3: concurrent desktop + phone punches merged in cloud
+PASS rule 3: ...and in the file
+PASS phone undo removes exactly that punch from file
+PASS rule 4: duplicate break-2 start trimmed to max 2 breaks (file)
+PASS rule 4: ...and cloud
+PASS rule 1 still holds after many writes (only saved/breakCount changed by desktop)
+PASS rule 3 race: desktop punch saved mid-sync kept in file
+PASS rule 3 race: ...and pushed to cloud
+PASS legacy -FileWrite WhenClosed + running: file untouched
+PASS back to default: queued punch written
 PASS log has no token/topic
-PASS bad token fails without touching file
-pc e2e: 12 passed, 0 failed
+PASS bad token: fails, file untouched
+pc e2e: 23 passed, 0 failed
