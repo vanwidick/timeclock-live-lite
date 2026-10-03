@@ -1,0 +1,49 @@
+PASS start shows only Clock In :: ['Clock In']
+PASS footer :: DESIGN BY VAN
+v1.0.0 · Oct 3, 2026
+PASS footer font Oswald
+PASS pay period range :: 9/26/2026 – 10/9/2026
+PASS pay period total pre :: 39:28
+PASS after in: break1/lunch/out :: ['Break 1 Start', 'Lunch Out', 'Clock Out']
+PASS on break only End :: ['Break 1 End']
+PASS countdown 15:00 :: 15:00
+PASS warn at <=3 min :: ('on warn', '2:55')
+PASS late at zero :: ('on late', 'LATE +0:06')
+PASS after b1: break2/lunch/out :: ['Break 2 Start', 'Lunch Out', 'Clock Out']
+PASS undo armed
+PASS undo restored break :: ['Break 1 End']
+PASS lunch only Lunch In :: ['Lunch In']
+PASS lunch not warn at 5:30 left :: 5:30
+PASS lunch warn at <=5 :: 4:30
+PASS after lunch: break2/out :: ['Break 2 Start', 'Clock Out']
+PASS after all: only Clock Out :: ['Clock Out']
+PASS after out: Clock Back In :: ['Clock Back In']
+PASS stored format :: [['in', 28680], ['bs', 34200], ['be', 35106], ['lo', 41406], ['li', 43176], ['bs', 50376], ['be', 51218], ['out', 58418]]
+Clock In
+7:58 AM
+Break 1 Start
+9:30 AM
+Break 1 End15:06
+9:45 AM
+Lunch Out
+11:30 AM
+Lunch In29:30
+11:59 AM
+Break 2 Start
+1:59 PM
+Break 2 End14:02
+2:13 PM
+Clock Out
+4:13 PM
+PASS timeline h:mm AM/PM
+PASS export filename
+PASS export keys :: ['app', 'version', 'saved', 'punches', 'days']
+{"clockIn": "07:58:00", "clockOut": "16:13:38", "break1": {"start": "09:30:00", "end": "09:45:06", "sec": 906, "open": false}, "break2": {"start": "13:59:36", "end": "14:13:38", "sec": 842, "open": false}, "lunch": {"start": "11:30:06", "end": "11:59:36", "sec": 1770, "open": false}, "breakCount": 2, "workedMin": 466}
+PASS summary fields
+PASS saved format :: 2026-10-03 16:13:38
+PASS worked today = 7:58->16:13:36 minus 29:30 lunch = 466 min :: 466
+PASS punches compact one-line
+PASS import roundtrip
+PASS no JS errors :: []
+PASS loads offline via SW
+ALL PASS
