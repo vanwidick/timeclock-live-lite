@@ -1,5 +1,5 @@
 PASS start shows only Clock In :: ['Clock In']
-FAIL footer :: DESIGN BY VAN
+PASS footer :: DESIGN BY VAN
 v1.2.0 · Oct 3, 2026
 PASS footer font Oswald
 PASS pay period range :: 9/26/2026 – 10/9/2026
@@ -56,4 +56,5 @@ PASS punches compact one-line
 PASS import roundtrip
 PASS no JS errors :: []
 PASS loads offline via SW
-SOME FAILED
+ALL PASS
+DONE
